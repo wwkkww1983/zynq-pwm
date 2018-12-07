@@ -1,12 +1,4 @@
-﻿/*
- *Xilinx pwm driver for axi_timer IP.
- *
- *This program is free software; you can redistribute it and/or modify
- *it under the terms of the GNU General Public License version 2
- *as published by the Free Software Foundation.
- */
-
-#include <linux/platform_device.h>
+﻿#include <linux/platform_device.h>
 #include <linux/pwm.h>
 #include <linux/device.h>
 #include <linux/module.h>
@@ -39,7 +31,7 @@ static int axi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm, int dut
     struct axi_pwm_chip *pc;
     pc = container_of(chip, struct axi_pwm_chip, chip);
     u32 up_count = pc->clk_ns / duty_ns;
-    u32 down_count = pc->clk_ns / (clk_ns - duty_ns);
+    u32 down_count = pc->clk_ns / (pc->clk_ns - duty_ns);
     iowrite32(up_count, pc->base_addr + AXI_PWM_CAPTURE_UP_ADDR);
     iowrite32(down_count, pc->base_addr + AXI_PWM_CAPTURE_DOWN_ADDR);
     return 0;
