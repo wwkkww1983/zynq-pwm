@@ -148,6 +148,7 @@ static int axi_pwm_probe(struct platform_device *pdev) {
 static struct platform_driver axi_pwm_driver = {
     .driver = {
         .name = "axi-pwm",
+        .owner = THIS_MODULE,
         .of_match_table = axi_pwm_of_match,
     },
     .probe = axi_pwm_probe,
