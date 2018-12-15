@@ -7,8 +7,6 @@
 #include <linux/of.h>
 #include <linux/io.h>
 
-// TODO: axi regiser mapping 
-#define AXI_PWM_ENABLE_ADDR         0x00000000
 #define AXI_PWM_GENERATE_UP_ADDR    0x00000000
 #define AXI_PWM_GENERATE_DOWN_ADDR  0x00000000
 #define AXI_PWM_CAPTURE_UP_ADDR     0x00000000
@@ -18,7 +16,6 @@ struct axi_pwm_chip {
     struct device *dev;
     struct pwm_chip chip;
     void __iomem *base_addr;
-    struct clk *clk;
     int clk_ns;
 };
 
@@ -49,19 +46,6 @@ static int axi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm, struct
     return 0;
 }
 
-static int axi_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm){
-    struct axi_pwm_chip *pc;
-    pc = container_of(chip, struct axi_pwm_chip, chip);
-    iowrite32(1, pc->base_addr + AXI_PWM_ENABLE_ADDR);
-    return 0;
-}
-
-static void axi_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm){
-    struct axi_pwm_chip *pc;
-    pc = container_of(chip, struct axi_pwm_chip, chip);
-    iowrite32(0, pc->base_addr + AXI_PWM_ENABLE_ADDR);
-}
-
 static int axi_pwm_remove(struct platform_device *pdev) {
     struct axi_pwm_chip *axi_pwm = platform_get_drvdata(pdev);
     clk_disable_unprepare(axi_pwm->clk);
@@ -71,8 +55,6 @@ static int axi_pwm_remove(struct platform_device *pdev) {
 static const struct pwm_ops axi_pwm_ops = {
     .config = axi_pwm_config,
     .capture = axi_pwm_capture,
-    .enable = axi_pwm_enable,
-    .disable = axi_pwm_disable,
     .owner = THIS_MODULE,
 };
 
@@ -90,6 +72,7 @@ static int axi_pwm_probe(struct platform_device *pdev) {
     struct axi_pwm_chip *axi_pwm;
     struct pwm_device *pwm;
     struct resource *res;
+    struct clk *clk;
     int ret,i;
     // allocate memory
     axi_pwm = devm_kzalloc(&pdev->dev, sizeof(*axi_pwm), GFP_KERNEL);
@@ -104,12 +87,12 @@ static int axi_pwm_probe(struct platform_device *pdev) {
     if (IS_ERR(axi_pwm->base_addr))
         return PTR_ERR(axi_pwm->base_addr);
     // get axi clock
-    axi_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-    if (IS_ERR(axi_pwm->clk)) {
+    clk = devm_clk_get(&pdev->dev, NULL);
+    if (IS_ERR(clk)) {
         dev_err(&pdev->dev, "failed to get pwm clock\n");
-        return PTR_ERR(axi_pwm->clk);
+        return PTR_ERR(clk);
     }
-    axi_pwm->clk_ns = (int)1000000000/clk_get_rate(axi_pwm->clk);
+    axi_pwm->clk_ns = (int)1000000000/clk_get_rate(clk);
     // pwm_chip settings binding
     axi_pwm->chip.dev = &pdev->dev;
     axi_pwm->chip.ops = &axi_pwm_ops;
@@ -141,7 +124,7 @@ static int axi_pwm_probe(struct platform_device *pdev) {
     pwmchip_remove:
     pwmchip_remove(&axi_pwm->chip);
     disable_pwmclk:
-    clk_disable_unprepare(axi_pwm->clk);
+    clk_disable_unprepare(clk);
     return ret;
 }
 
