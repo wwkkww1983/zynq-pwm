@@ -7,10 +7,10 @@
 #include <linux/of.h>
 #include <linux/io.h>
 
-#define AXI_PWM_GENERATE_UP_ADDR    0x00000000
 #define AXI_PWM_GENERATE_DOWN_ADDR  0x00000000
-#define AXI_PWM_CAPTURE_UP_ADDR     0x00000000
-#define AXI_PWM_CAPTURE_DOWN_ADDR   0x00000000
+#define AXI_PWM_GENERATE_UP_ADDR    0x00000004
+#define AXI_PWM_CAPTURE_DOWN_ADDR   0x00000008
+#define AXI_PWM_CAPTURE_UP_ADDR     0x0000000C
 
 struct axi_pwm_chip {
     struct device *dev;
@@ -26,9 +26,10 @@ static inline struct axi_pwm_chip *to_axi_pwm_chip(struct pwm_chip *chip){
 // configure output duty_cycle and frequency
 static int axi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm, int duty_ns, int period_ns){
     struct axi_pwm_chip *pc;
+    u32 up_count, down_count;
     pc = container_of(chip, struct axi_pwm_chip, chip);
-    u32 up_count = pc->clk_ns / duty_ns;
-    u32 down_count = pc->clk_ns / (pc->clk_ns - duty_ns);
+    up_count = duty_ns / pc->clk_ns;
+    down_count = (period_ns - duty_ns) / pc->clk_ns;
     iowrite32(up_count, pc->base_addr + AXI_PWM_CAPTURE_UP_ADDR);
     iowrite32(down_count, pc->base_addr + AXI_PWM_CAPTURE_DOWN_ADDR);
     return 0;
@@ -38,11 +39,12 @@ static int axi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm, struct
     // TODO: we don't provide timeout, the result only depend on late capture time.
     // slide average should be apply here for timeout.
     struct axi_pwm_chip *pc;
+    u32 up_count, down_count;
     pc = container_of(chip, struct axi_pwm_chip, chip);
-    u32 up_count = ioread32(pc->base_addr + AXI_PWM_CAPTURE_UP_ADDR);
-    u32 down_count = ioread32(pc->base_addr + AXI_PWM_CAPTURE_DOWN_ADDR);
-    result->period = pc->clk_ns / (up_count + down_count);
-    result->duty_cycle = pc->clk_ns / up_count; 
+    up_count = ioread32(pc->base_addr + AXI_PWM_CAPTURE_UP_ADDR);
+    down_count = ioread32(pc->base_addr + AXI_PWM_CAPTURE_DOWN_ADDR);
+    result->period = pc->clk_ns * (up_count + down_count);
+    result->duty_cycle = pc->clk_ns * up_count; 
     return 0;
 }
 
@@ -63,7 +65,7 @@ struct axi_pwm_data {
 };
 
 static const struct of_device_id axi_pwm_of_match[] = {
-    { .compatible = "axi-pwm" },
+    { .compatible = "chiselblocks-pwm" },
     {}
 };
 MODULE_DEVICE_TABLE(of, axi_pwm_of_match);
@@ -130,7 +132,7 @@ static int axi_pwm_probe(struct platform_device *pdev) {
 
 static struct platform_driver axi_pwm_driver = {
     .driver = {
-        .name = "axi-pwm",
+        .name = "chiselblocks-pwm",
         .owner = THIS_MODULE,
         .of_match_table = axi_pwm_of_match,
     },
@@ -140,4 +142,4 @@ static struct platform_driver axi_pwm_driver = {
 module_platform_driver(axi_pwm_driver);
 
 MODULE_LICENSE("GPL"); 
-MODULE_DESCRIPTION("A AXI PWM driver");
+MODULE_DESCRIPTION("chiselblock's AXI driver.");
